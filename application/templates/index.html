@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!--/usercode/flaskapplication/templates/index.html-->
+    <!--<link rel="stylesheet" href="styles.css" type="text/css" /> -->
+
+    <link rel="stylesheet" href="../static/style.css">
+    <title>Intelligent Text Assistance</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+    $(document).ready(function() 
+    {
+        var typingTimer;
+        var doneTypingInterval = 0;  
+        $('#inputForm').on('input', function() 
+        {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(processText, doneTypingInterval);
+        });
+        var editableDiv = document.getElementById('textInput');
+
+        function processText() 
+        {
+            var text = $('#textInput').text();
+            var lastCharacter = text.slice(-1);
+            if (text !== '' && (lastCharacter === ' ' || !lastCharacter.match(/[a-zA-Z]/))) {
+                $.ajax({
+                    url: '/predict',
+                    type: 'POST',
+                    data: { text: text },
+                    success: function(response) {
+                        $('#predictionResult').text(response.prediction);                       
+                    },
+                    error: function(xhr, status, error) {
+                        console.log('AJAX request error:', error);
+                    }
+                }); 
+            }
+        }
+    });    
+
+    $(document).ready(function() {
+        $('#completion-button').click(function() {
+            var formData = $('#textInput').text();
+            $.ajax({
+                url: '/complete',
+                method: 'POST',
+                data: {formData : formData},
+                success: function(response) {
+                    console.log(response);
+                    $('#textInput').html(response); 
+                },
+                error: function(xhr, status, error) {
+                    console.log('AJAX request error:', error);
+                }
+            });
+        });
+    });
+    
+    $(document).ready(function(){
+        $('#fixByCursor-button').click(function(){
+            const selection = window.getSelection();
+            selection?.modify('move', 'backward', 'word');
+            selection?.modify('extend', 'forward', 'word');
+            const text = selection.toString();
+            
+            $.ajax({
+                url: '/fix_current',
+                method: 'POST',
+                data : { text: text },
+                success: function(response){
+                    const newNode = document.createTextNode(response);
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(newNode);
+
+                    range.setEnd(newNode, newNode.length);
+                    range.setStart(newNode, newNode.length);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                },
+                
+                error: function(xhr, status, error){
+                    console.log('AJAX request error:', error);
+                }
+            });
+        });
+    });
+    $(document).ready(function() {
+        $('#fix-button').click(function() {
+            var text = $('#textInput').text();
+            $.ajax({
+                url: '/fix_all',
+                method: 'POST',
+                data : { text: text },
+                success: function(response) {
+
+                    $('#textInput').html(response); 
+
+                    const editableDiv = document.getElementById('textInput');
+
+                    const range = document.createRange();
+                    range.selectNodeContents(editableDiv);
+                    range.collapse(false);
+
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    editableDiv.focus();
+                },
+                error: function(xhr, status, error) {
+                    console.log('AJAX request error:', error);
+                }
+            });
+        });
+    });
+
+    </script>
+</head>
+
+<body>
+    <header>
+        <h1>Intelligent Text Assistant for Prediction and Correction</h1>
+    </header>
+    <section>
+    <h1>Suggestions</h1>
+    <form id="inputForm">
+        <div id='textInput' contenteditable =true></div> 
+        <span id="predictionResult"></span> 
+    </form>   
+    <div>
+        <button id="completion-button">Complete Sentence</button>
+        <button id="fixByCursor-button">Fix Current</button>
+        <button id="fix-button">Fix All Spellings</button>
+    </div>
+</section>
+    <br> <br> 
+</body>
+</html>
